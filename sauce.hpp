@@ -8,6 +8,7 @@
 #include <fstream>
 #include <cstring>
 #include <cstdint>
+#include <iostream>
 
 namespace consts {
 
@@ -114,7 +115,7 @@ inline static constexpr float fast_sqrt(const float f) {
 
 //////////////////////////// TOKENIZER //////////////////////////// 
 
-inline static constexpr std::vector<std::string_view> tokenize(const char* str, const uint64_t size, const char delim = ' ') {
+inline static std::vector<std::string_view> tokenize(const char* str, const uint64_t size, const char delim = ' ') {
 	static constexpr uint64_t minTokens = 8;
 
 	std::vector<std::string_view> tokens;
@@ -358,7 +359,7 @@ class BufferedFileWriter : public BufferedFileHandler {
 public:
 	BufferedFileWriter(const std::string_view fileName)
 			: BufferedFileHandler(fileName)
-			, m_stream(fileName, std::ios::out | std::ios::binary) {
+			, m_stream(fileName.data(), std::ios::out | std::ios::binary) {
 		m_isOk = m_stream.good();
 	}
 	
@@ -417,7 +418,7 @@ class BufferedFileReader : public BufferedFileHandler {
 public:
 	BufferedFileReader(const std::string_view fileName)
 			: BufferedFileHandler(fileName)
-			, m_stream(fileName, std::ios::in | std::ios::binary) {
+			, m_stream(fileName.data(), std::ios::in | std::ios::binary) {
 		m_isOk = m_stream.good();
 		m_bufferReader.fill(m_stream);
 	}

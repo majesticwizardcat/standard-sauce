@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.8)
-set(CMAKE_CXX_STANDARD_REQUIRED true)
+cmake_minimum_required(VERSION 3.28)
 
-add_compile_options(-std=c++20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED true)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(sauce)
 
