@@ -6,6 +6,8 @@
 #include <memory>
 #include <cassert>
 #include <fstream>
+#include <cstring>
+#include <cstdint>
 
 namespace consts {
 
@@ -17,9 +19,6 @@ static constexpr float PI_OVER_TWO = PI * 0.5f;
 
 }
 
-typedef unsigned char uint8_t;
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
 typedef char byte_t;
 
 namespace sauce {
