@@ -9,6 +9,8 @@
 #include <cstring>
 #include <cstdint>
 #include <iostream>
+#include <bit>
+#include <limits>
 
 namespace consts {
 
@@ -96,17 +98,13 @@ inline static constexpr bool are_not_close(const float f0, const float f1) {
 	return std::abs(f0 - f1) > consts::CLOSE_ERROR;
 }
 
-inline static float fast_inv_sqrt(float f) {
-	constexpr float threehalves = 1.5f;
-	const float x2 = f * 0.5f;
+inline static constexpr float fast_inv_sqrt(const float r) {
+	static_assert(std::numeric_limits<float>::is_iec559); // (enable only on IEEE 754)
 
-	long long i = *reinterpret_cast<long long*>(&f);
-	i = 0x5f3759df - (i >> 1);
-	f = *reinterpret_cast<float*>(&i);
-
-	f = f * (threehalves - (x2 * f * f));
-	f = f * (threehalves - (x2 * f * f));
-	return f;
+	const float halfR = 0.5f * r;
+	const float y = std::bit_cast<float>(0x5f3759df - (std::bit_cast<std::uint32_t>(r) >> 1));
+	const float f = y * (1.5f - (halfR * y * y));
+	return f * (1.5f - (halfR * f * f));
 }
 
 inline static constexpr float fast_sqrt(const float f) {
