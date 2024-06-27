@@ -50,22 +50,22 @@ public:
 			, m_array(std::move(other.m_array)) { }
 
 
-	inline constexpr uint64_t size() const { return m_size; }
-	inline constexpr auto begin() const { return m_array.begin(); }
-	inline constexpr auto end() const { return m_array.begin() + m_size; }
-	inline constexpr bool empty() const { return m_size == 0; }
-	inline constexpr const T* data() const { return m_array.data(); }
-	inline constexpr const T& operator[](const uint64_t pos) const { assert(pos < m_size); return m_array[pos]; }
+	constexpr uint64_t size() const { return m_size; }
+	constexpr auto begin() const { return m_array.begin(); }
+	constexpr auto end() const { return m_array.begin() + m_size; }
+	constexpr bool empty() const { return m_size == 0; }
+	constexpr const T* data() const { return m_array.data(); }
+	constexpr const T& operator[](const uint64_t pos) const { assert(pos < m_size); return m_array[pos]; }
 
-	inline constexpr void push(const T& val) { m_array[m_size++] = val; }
-	inline constexpr T pop() { return m_array[--m_size]; }
-	inline constexpr void erase(const uint64_t index) { std::swap(m_array[index], m_array[--m_size]); }
-	inline constexpr void clear() { m_size = 0; }
-	inline constexpr T& addNew() { return m_array[m_size++]; }
-	inline constexpr T& operator[](const uint64_t pos) { m_size = std::max(m_size, pos + 1); return m_array[pos]; }
-	inline constexpr T* mutableData() { return m_array.data(); }
+	constexpr void push(const T& val) { m_array[m_size++] = val; }
+	constexpr T pop() { return m_array[--m_size]; }
+	constexpr void erase(const uint64_t index) { std::swap(m_array[index], m_array[--m_size]); }
+	constexpr void clear() { m_size = 0; }
+	constexpr T& addNew() { return m_array[m_size++]; }
+	constexpr T& operator[](const uint64_t pos) { m_size = std::max(m_size, pos + 1); return m_array[pos]; }
+	constexpr T* mutableData() { return m_array.data(); }
 
-	inline constexpr StaticVector& operator=(StaticVector&& other) {
+	constexpr StaticVector& operator=(StaticVector&& other) {
 		m_array = std::move(other.m_array);
 		m_size = std::move(other.m_size);
 		return *this;
@@ -78,27 +78,27 @@ private:
 
 //////////////////////////// COMMON FUNCTIONS //////////////////////////// 
 
-inline static constexpr bool are_equal(const float f0, const float f1) {
+static constexpr bool are_equal(const float f0, const float f1) {
 	return std::abs(f0 - f1) < consts::ERROR;
 }
 
-inline static constexpr bool are_not_equal(const float f0, const float f1) {
+static constexpr bool are_not_equal(const float f0, const float f1) {
 	return std::abs(f0 - f1) > consts::ERROR;
 }
 
-inline static constexpr bool is_zero(const float f) {
+static constexpr bool is_zero(const float f) {
 	return are_equal(f, 0.0f);
 }
 
-inline static constexpr bool are_close(const float f0, const float f1) {
+static constexpr bool are_close(const float f0, const float f1) {
 	return std::abs(f0 - f1) < consts::CLOSE_ERROR;
 }
 
-inline static constexpr bool are_not_close(const float f0, const float f1) {
+static constexpr bool are_not_close(const float f0, const float f1) {
 	return std::abs(f0 - f1) > consts::CLOSE_ERROR;
 }
 
-inline static constexpr float fast_inv_sqrt(const float r) {
+static constexpr float fast_inv_sqrt(const float r) {
 	static_assert(std::numeric_limits<float>::is_iec559); // (enable only on IEEE 754)
 
 	const float halfR = 0.5f * r;
@@ -107,14 +107,14 @@ inline static constexpr float fast_inv_sqrt(const float r) {
 	return f * (1.5f - (halfR * f * f));
 }
 
-inline static constexpr float fast_sqrt(const float f) {
+static constexpr float fast_sqrt(const float f) {
 	return 1.0f / fast_inv_sqrt(f);
 }
 
 //////////////////////////// TOKENIZER //////////////////////////// 
 
-inline static std::vector<std::string_view> tokenize(const char* str, const uint64_t size, const char delim = ' ') {
-	static constexpr uint64_t minTokens = 8;
+static constexpr std::vector<std::string_view> tokenize(const char* str, const uint64_t size, const char delim = ' ') {
+	static constexpr uint64_t minTokens = 16;
 
 	std::vector<std::string_view> tokens;
 	tokens.reserve(minTokens);
@@ -136,11 +136,11 @@ inline static std::vector<std::string_view> tokenize(const char* str, const uint
 	return tokens;
 }
 
-inline static constexpr std::vector<std::string_view> tokenize(const std::string& str, const char delim = ' ') {
+static constexpr std::vector<std::string_view> tokenize(const std::string& str, const char delim = ' ') {
 	return sauce::tokenize(str.c_str(), str.size(), delim);
 }
 
-inline static constexpr std::vector<std::string_view> tokenize(const std::string_view str, const char delim = ' ') {
+static constexpr std::vector<std::string_view> tokenize(const std::string_view str, const char delim = ' ') {
 	return sauce::tokenize(str.data(), str.size(), delim);
 }
 
@@ -153,7 +153,7 @@ public:
 			, m_bufferCapacity(capacity)
 			, m_currentBufferSize(0) { }
 
-	virtual inline constexpr void reset() {
+	virtual constexpr void reset() {
 		m_currentBufferSize = 0;
 	}
 
@@ -198,11 +198,11 @@ public:
 		readBytesToBuffer(bufferOut, getBytesAvailable());
 	}
 
-	inline constexpr uint64_t getBytesAvailable() const {
+	constexpr uint64_t getBytesAvailable() const {
 		return m_bufferReadEnd - m_currentBufferSize;
 	}
 
-	inline constexpr void reset() override {
+	constexpr void reset() override {
 		Buffer::reset();
 		m_bufferReadEnd = 0;
 	}
@@ -250,7 +250,7 @@ public:
 		m_currentBufferSize += numOfBytes;
 	}
 
-	template <typename T> inline constexpr bool canWrite(const T& obj) const {
+	template <typename T> constexpr bool canWrite(const T& obj) const {
 		return canWrite(sizeof(obj));
 	}
 
@@ -258,11 +258,11 @@ public:
 		return m_currentBufferSize + numOfBytes <= m_bufferCapacity;
 	}
 
-	inline constexpr uint64_t bytesWritten() const {
+	constexpr uint64_t bytesWritten() const {
 		return m_currentBufferSize;
 	}
 
-	inline constexpr uint64_t availableSpace() const {
+	constexpr uint64_t availableSpace() const {
 		return m_bufferCapacity - m_currentBufferSize;
 	}
 
@@ -275,7 +275,7 @@ public:
 		reset();
 	}
 
-	inline constexpr const byte_t* getBuffer() const {
+	constexpr const byte_t* getBuffer() const {
 		return m_buffer;
 	}
 
@@ -312,7 +312,7 @@ public:
 		BufferWriter::writeBytes(bytes, numOfBytes);
 	}
 
-	inline constexpr bool canWrite(const uint64_t numOfBytes) const override {
+	constexpr bool canWrite(const uint64_t numOfBytes) const override {
 		return m_allowRealloc || BufferWriter::canWrite(numOfBytes);
 	}
 
@@ -339,11 +339,11 @@ public:
 
 	virtual ~BufferedFileHandler() { }
 
-	inline constexpr std::string_view getName() const {
+	constexpr std::string_view getName() const {
 		return m_fileName;
 	}
 
-	inline constexpr bool isOk() const {
+	constexpr bool isOk() const {
 		return m_isOk;
 	}
 
