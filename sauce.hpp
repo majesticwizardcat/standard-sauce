@@ -1,16 +1,19 @@
 #pragma once
 
 #include <array>
-#include <vector>
-#include <string>
-#include <memory>
+#include <algorithm>
+#include <bit>
 #include <cassert>
-#include <fstream>
 #include <cstring>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
-#include <bit>
 #include <limits>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace consts {
 
@@ -20,24 +23,194 @@ static constexpr float PI = 3.14159f;
 static constexpr float TWO_PI = 2.0f * PI;
 static constexpr float PI_OVER_TWO = PI * 0.5f;
 
+static constexpr uint64_t KILO_BYTE = 1024;
+
 }
+
+#ifdef SAUCE_DEBUG_OUTPUT
+#define SAUCE_DEBUG_PRINT(X) std::cout << X << '\n'
+#else
+#define SAUCE_DEBUG_PRINT(X)
+#endif
 
 typedef char byte_t;
 
 namespace sauce {
 
-//////////////////////////// COMMON DATA STRUCTS //////////////////////////// 
+//////////////////////////// MEMORY EXTENSIONS //////////////////////////// 
+
+// Non-atomic ref counted ptr
+template <typename T> class RefCountedPtr {
+public:
+	inline RefCountedPtr()
+			: m_ptr(nullptr)
+			, m_refCounter(nullptr) { SAUCE_DEBUG_PRINT("RefCountedPtr()"); }
+
+	inline RefCountedPtr(T* ptr)
+			: m_ptr(ptr)
+			, m_refCounter(new uint64_t(1)) { SAUCE_DEBUG_PRINT("RefCountedPtr(T* ptr)"); }
+	
+	inline RefCountedPtr(const RefCountedPtr<T>& other)
+			: m_ptr(other.m_ptr)
+			, m_refCounter(other.m_refCounter) {
+		copyFromPtr(other);
+
+		if (!m_refCounter) {
+			SAUCE_DEBUG_PRINT("RefCountedPtr(const RefCountedPtr<T>&) -> Counter: nullptr");
+		}
+		else {
+			SAUCE_DEBUG_PRINT("RefCountedPtr(const RefCountedPtr<T>&) -> Counter: " << *m_refCounter);
+		}
+	}
+
+	inline RefCountedPtr(RefCountedPtr<T>&& other)
+			: m_ptr(other.m_ptr)
+			, m_refCounter(other.m_refCounter) {
+		SAUCE_DEBUG_PRINT("RefCountedPtr(RefCountedPtr<T>&&)");
+		other.m_ptr = nullptr;
+		other.m_refCounter = nullptr;
+	}
+	
+	inline ~RefCountedPtr() {
+		if (!m_refCounter) {
+			assert(!m_ptr);
+			SAUCE_DEBUG_PRINT("~RefCountedPtr() -> Counter: nullptr");
+			return;
+		}
+
+		SAUCE_DEBUG_PRINT("~RefCountedPtr() -> Counter: " << *m_refCounter);
+
+		assert(m_refCounter);
+		assert(*m_refCounter > 0);
+
+		{
+			uint64_t& counter = *m_refCounter;
+			counter--;
+		}
+
+		if (m_ptr) {
+			if (*m_refCounter == 0) {
+				SAUCE_DEBUG_PRINT("Deleting pointer");
+				delete m_ptr;
+			}
+
+			m_ptr = nullptr;
+		}
+
+		if (*m_refCounter == 0) {
+			SAUCE_DEBUG_PRINT("Deleting ref counter");
+			delete m_refCounter;
+			m_refCounter = nullptr;
+		}
+	}
+
+	inline RefCountedPtr<T> operator=(const RefCountedPtr<T>& other) {
+		copyFromPtr(other);
+		if (!m_refCounter) {
+			SAUCE_DEBUG_PRINT("RefCountedPtr(const RefCountedPtr<T>&) -> Counter: nullptr");
+		}
+		else {
+			SAUCE_DEBUG_PRINT("RefCountedPtr(const RefCountedPtr<T>&) -> Counter: " << *m_refCounter);
+		}
+
+		return *this;
+	}
+
+	inline RefCountedPtr<T> operator=(RefCountedPtr<T>&& other) {
+		SAUCE_DEBUG_PRINT("operator=(RefCounterPtr<T>&&)");
+		m_ptr = other.m_ptr;
+		m_refCounter = other.m_refCounter;
+
+		other.m_ptr = nullptr;
+		other.m_refCounter = nullptr;
+		return *this;
+	}
+
+	inline T* get() const { return m_ptr; }
+	inline T& operator*() const { return *m_ptr; }
+	inline T* operator->() const { return m_ptr; }
+
+	inline operator bool() const { return m_ptr != nullptr; }
+
+private:
+	T* m_ptr;
+	uint64_t* m_refCounter;
+
+	void copyFromPtr(const RefCountedPtr<T>& other) {
+		m_ptr = other.m_ptr;
+		m_refCounter = other.m_refCounter;
+
+		if (m_refCounter) {
+			uint64_t& counter = *m_refCounter;
+			counter++;
+		}
+		assert((m_ptr && m_refCounter) || (!m_ptr && !m_refCounter));
+	}
+};
+
+template <typename T, typename ...Args> inline static RefCountedPtr<T> make_ref_counted(Args... args) { return RefCountedPtr<T>(new T(args...)); }
+
+class RefCountedObject {
+public:
+	RefCountedObject(RefCountedObject&& other) = delete; // only allow copy
+
+	inline RefCountedObject()
+			: m_refCounter(new uint64_t(1)) { }
+	
+	inline RefCountedObject(const RefCountedObject& other)
+			: m_refCounter(other.m_refCounter) {
+		increaseRef();
+	}
+
+	virtual inline ~RefCountedObject() {
+		assert(m_refCounter);
+		assert(*m_refCounter > 0);
+		uint64_t& counter = *m_refCounter;
+		counter--;
+
+		if (counter == 0) {
+			delete m_refCounter;
+		}
+
+		m_refCounter = nullptr;
+	}
+
+	RefCountedObject operator=(const RefCountedObject& other) {
+		assert(!m_refCounter);
+		m_refCounter = other.m_refCounter;
+		increaseRef();
+		return *this;
+	}
+
+protected:
+	inline bool isLastRef() const { assert(m_refCounter); return *m_refCounter <= 1; }
+
+private:
+	uint64_t* m_refCounter;
+
+	inline void increaseRef() {
+		assert(m_refCounter);
+		uint64_t& counter = *m_refCounter;
+		counter++;
+	}
+};
+
+//////////////////////////// DATA STRUCTS //////////////////////////// 
 
 template <typename T, uint64_t Capacity> class StaticVector {
 	static_assert(std::is_trivially_destructible_v<T>);
 
 public:
 	constexpr StaticVector()
-			: m_size(0) { }
+			: m_size(0)
+			, m_array{} { }
 
-	constexpr StaticVector(std::initializer_list<T> initValues)
-			: m_size(initValues.size()) {
-		std::move(initValues.begin(), initValues.end(), m_array.begin());
+	constexpr StaticVector(const std::initializer_list<T> initValues)
+			: m_size(initValues.size())
+			, m_array{} {
+		for (uint64_t i = 0; i < m_size; ++i) {
+			m_array[i] = *(initValues.begin() + i);
+		}
 	}
 
 	constexpr StaticVector(const StaticVector& other)
@@ -57,13 +230,15 @@ public:
 	constexpr const T* data() const { return m_array.data(); }
 	constexpr const T& operator[](const uint64_t pos) const { assert(pos < m_size); return m_array[pos]; }
 
-	constexpr void push(const T& val) { m_array[m_size++] = val; }
-	constexpr T pop() { return m_array[--m_size]; }
+	constexpr auto begin() { return m_array.begin(); }
+	constexpr auto end() { return m_array.begin() + m_size; }
+	constexpr void push_back(const T& val) { m_array[m_size++] = val; }
+	template <typename ...Args> constexpr void emplace_back(Args... args) { m_array[m_size++] = T(args...); }
+	constexpr T pop_back() { return m_array[--m_size]; }
 	constexpr void erase(const uint64_t index) { std::swap(m_array[index], m_array[--m_size]); }
 	constexpr void clear() { m_size = 0; }
 	constexpr T& addNew() { return m_array[m_size++]; }
 	constexpr T& operator[](const uint64_t pos) { m_size = std::max(m_size, pos + 1); return m_array[pos]; }
-	constexpr T* mutableData() { return m_array.data(); }
 
 	constexpr StaticVector& operator=(StaticVector&& other) {
 		m_array = std::move(other.m_array);
@@ -76,7 +251,76 @@ private:
 	std::array<T, Capacity> m_array;
 };
 
-//////////////////////////// COMMON FUNCTIONS //////////////////////////// 
+template <uint64_t Size> class RingBufferIndexGenerator {
+public:
+	constexpr RingBufferIndexGenerator()
+			: m_nextIndex(0)
+			, m_releasedIndex(0) { }
+	
+	constexpr uint64_t getNext() {
+		assert(hasAvailable());
+		return m_nextIndex++ % Size;
+	}
+
+	constexpr void release() {
+		assert((m_releasedIndex + 1) % Size <= m_nextIndex);
+		m_releasedIndex = (m_releasedIndex + 1) % Size;
+	}
+
+	constexpr bool hasAvailable() const { 
+		return (m_nextIndex + 1) % Size != m_releasedIndex;
+	}
+
+private:
+	uint64_t m_nextIndex;
+	uint64_t m_releasedIndex;
+};
+
+template <typename T, uint64_t Capacity, typename HashFunction, typename Comparer> class StaticIndexedHashMap {
+public:
+	constexpr StaticIndexedHashMap()
+	  		: m_size(0)
+			, m_array{} { }
+	
+	constexpr uint64_t add(const T& value) {
+		assert(m_size < Capacity);
+
+		const uint64_t hash = std::max(1ull, HashFunction::hash(value));
+		uint64_t index = hash % Capacity;
+		for (; ; index = (index + 1) % Capacity) {
+			HashValuePair& pair = m_array[index];
+			if (pair.hash == hash) {
+				if (Comparer::areEqual(pair.value, value)) {
+					break;
+				}
+			}
+			else if (pair.hash == 0) {
+				pair.hash = hash;
+				pair.value = value;
+				m_size++;
+				break;
+			}
+		}
+
+		return index;
+	}
+
+	constexpr const T& getFromIndex(const uint64_t index) const {
+		assert(index < Capacity);
+		return m_array[index].value;
+	}
+
+private:
+	struct HashValuePair {
+		uint64_t hash;
+		T value;
+	};
+
+	uint64_t m_size;
+	std::array<HashValuePair, Capacity> m_array;
+};
+
+//////////////////////////// FUNCTIONS //////////////////////////// 
 
 static constexpr bool are_equal(const float f0, const float f1) {
 	return std::abs(f0 - f1) < consts::ERROR;
@@ -111,37 +355,101 @@ static constexpr float fast_sqrt(const float f) {
 	return 1.0f / fast_inv_sqrt(f);
 }
 
+static constexpr uint8_t count_one_bits(const uint64_t value) {
+	uint8_t bits = 0;
+	for (uint64_t i = 0; i < 64; ++i) {
+		bits += ((value >> i) & 0x1);
+	}
+
+	return bits;
+}
+
+static constexpr bool is_aligned_pow2(const uint64_t value, const uint64_t alignment) {
+	assert(alignment > 0);
+	assert(count_one_bits(alignment) == 1);
+
+	const uint64_t alignmentMask = alignment - 1;
+	return alignmentMask == 0 || (value & alignmentMask) == 0;
+}
+
+static constexpr uint64_t get_aligned_pow2(const uint64_t value, const uint64_t alignment) {
+	assert(alignment > 1);
+	assert(count_one_bits(alignment) == 1);
+
+	const uint64_t alignmentMask = alignment - 1;
+	const uint64_t pad = (value & alignmentMask) > 0 ? alignment : 0; 
+	return (value & ~alignmentMask) + pad;
+}
+
+inline static bool parse_whole_file(const std::string_view fileLocation, std::string& output) {
+	std::ifstream file(fileLocation);
+
+	if (!file) {
+		std::cout << "Failed to open file: " << fileLocation << '\n';
+		return false;
+	}
+
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	output = buffer.str();
+
+	return true;
+}
+
+inline static bool save_to_file(const std::string& str, const std::string_view fileLocation) {
+	std::ofstream file(fileLocation);
+
+	if (!file) {
+		std::cout << "Failed to open file for write: " << fileLocation << '\n';
+		return false;
+	}
+
+	file.write(str.data(), str.size());
+	return true;
+}
+
+static constexpr std::string_view trimSpacesLeft(std::string_view str) {
+	str.remove_prefix(std::min(str.find_first_not_of(" "), str.size()));
+	return str;
+}
+
 //////////////////////////// TOKENIZER //////////////////////////// 
 
-static constexpr std::vector<std::string_view> tokenize(const char* str, const uint64_t size, const char delim = ' ') {
-	static constexpr uint64_t minTokens = 16;
-
-	std::vector<std::string_view> tokens;
-	tokens.reserve(minTokens);
+template <typename OutputType> static constexpr void tokenize(OutputType& tokensOut, const char* str, const uint64_t size, const char delim = ' ', const uint64_t maxTokens = std::numeric_limits<uint64_t>::max()) {
+	tokensOut.clear();
 
 	uint64_t curWordStart = 0;
 	for (uint64_t i = 0; i < size; ++i) {
 		if (str[i] == delim) {
 			if (i != curWordStart) {
-				tokens.emplace_back(str + curWordStart, i - curWordStart);
+				tokensOut.emplace_back(str + curWordStart, i - curWordStart);
+
+				if (tokensOut.size() >= maxTokens) {
+					return;
+				}
 			}
 
 			curWordStart = i + 1;
 		}
 	}
 	if (curWordStart != size) {
-		tokens.emplace_back(str + curWordStart);
+		tokensOut.emplace_back(str + curWordStart, size - curWordStart);
 	}
+}
 
+template <uint64_t NumOfTokens> static constexpr StaticVector<std::string_view, NumOfTokens> tokenize(const std::string_view str, const char delim = ' ') {
+	StaticVector<std::string_view, NumOfTokens> tokens;
+	tokenize(tokens, str.data(), str.size(), delim, NumOfTokens);
 	return tokens;
 }
 
-static constexpr std::vector<std::string_view> tokenize(const std::string& str, const char delim = ' ') {
-	return sauce::tokenize(str.c_str(), str.size(), delim);
-}
-
 static constexpr std::vector<std::string_view> tokenize(const std::string_view str, const char delim = ' ') {
-	return sauce::tokenize(str.data(), str.size(), delim);
+	static constexpr uint64_t minTokens = 32;
+
+	std::vector<std::string_view> tokens;
+	tokens.reserve(minTokens);
+	tokenize(tokens,  str.data(), str.size(), delim);
+	return tokens;
 }
 
 //////////////////////////// BYTE IO //////////////////////////// 

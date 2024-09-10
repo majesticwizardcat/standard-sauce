@@ -11,13 +11,7 @@ if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" AND USE_NEON)
 	add_compile_definitions("ARM_NEON")
 endif()
 
-if (${CMAKE_BUILD_TYPE} MATCHES "Release")
-	message(STATUS "Buidling Release")
-	add_compile_definitions("NDEBUG")
-	add_compile_options(-O3)
-else()
-	message(STATUS "Buidling Debug")
-endif()
+message(STATUS "Buidling Debug")
 
 include_directories(./)
 
