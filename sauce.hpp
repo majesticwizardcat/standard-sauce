@@ -33,6 +33,12 @@ static constexpr uint64_t KILO_BYTE = 1024;
 #define SAUCE_DEBUG_PRINT(X)
 #endif
 
+#ifdef NDEBUG
+#define ASSERT_CODE(X)
+#else
+#define ASSERT_CODE(X) X
+#endif
+
 typedef char byte_t;
 
 namespace sauce {
@@ -227,11 +233,14 @@ public:
 	constexpr auto begin() const { return m_array.begin(); }
 	constexpr auto end() const { return m_array.begin() + m_size; }
 	constexpr bool empty() const { return m_size == 0; }
+	constexpr bool full() const { return m_size == Capacity; }
 	constexpr const T* data() const { return m_array.data(); }
 	constexpr const T& operator[](const uint64_t pos) const { assert(pos < m_size); return m_array[pos]; }
+	constexpr const T& back() const { assert(m_size > 0); return m_array[m_size - 1]; }
 
 	constexpr auto begin() { return m_array.begin(); }
 	constexpr auto end() { return m_array.begin() + m_size; }
+	constexpr T& back() { assert(m_size > 0); return m_array[m_size - 1]; }
 	constexpr void push_back(const T& val) { m_array[m_size++] = val; }
 	template <typename ...Args> constexpr void emplace_back(Args... args) { m_array[m_size++] = T(args...); }
 	constexpr T pop_back() { return m_array[--m_size]; }
@@ -381,7 +390,7 @@ static constexpr uint64_t get_aligned_pow2(const uint64_t value, const uint64_t 
 	return (value & ~alignmentMask) + pad;
 }
 
-inline static bool parse_whole_file(const std::string_view fileLocation, std::string& output) {
+inline static bool parse_whole_file(const char* fileLocation, std::string& output) {
 	std::ifstream file(fileLocation);
 
 	if (!file) {
@@ -396,7 +405,11 @@ inline static bool parse_whole_file(const std::string_view fileLocation, std::st
 	return true;
 }
 
-inline static bool save_to_file(const std::string& str, const std::string_view fileLocation) {
+inline static bool parse_whole_file(const std::string& fileLocation, std::string& output) {
+	return parse_whole_file(fileLocation.c_str(), output);
+}
+
+inline static bool save_to_file(const std::string& str, const char* fileLocation) {
 	std::ofstream file(fileLocation);
 
 	if (!file) {
@@ -408,8 +421,8 @@ inline static bool save_to_file(const std::string& str, const std::string_view f
 	return true;
 }
 
-static constexpr std::string_view trimSpacesLeft(std::string_view str) {
-	str.remove_prefix(std::min(str.find_first_not_of(" "), str.size()));
+static constexpr std::string_view trim_spaces_left(std::string_view str) {
+	str.remove_prefix(std::min(str.find_first_not_of(" \t"), str.size()));
 	return str;
 }
 
